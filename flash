@@ -64,10 +64,11 @@ print_usage() {
 	END_USAGE
 }
 
+# Remember User's Starting Directory
+# PWD="$(pwd)"
+
 return
 
-# Remember User's Starting Directory
-PWD="$(pwd)"
 # Where Decks Are Located for linux & mac
 # Prefer XDG Configuration before hard coded file paths
 OS="$(uname)"
