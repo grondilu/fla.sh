@@ -46,9 +46,9 @@ declare WHITE=$'\033[1;37m$'
 declare NC=$'\033[0m$' # No Color
 
 # ANSI BACKGROUND ESCAPE COLORS
-WHITEBG=$'\033[1;47m$'
+declare WHITEBG=$'\033[1;47m$'
 # FONT FORMAT EXCAPE CODES
-BOLD=$'\e[1m$'
+declare BOLD=$'\e[1m$'
 
 print_usage() {
   cat <<-END_USAGE
