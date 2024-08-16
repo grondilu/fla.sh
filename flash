@@ -283,7 +283,7 @@ print-head() {
 }
 
 # Creating new entries in the log for the average score generation
-add_usage_entry() {
+add-usage-entry() {
     if [ ! "$COUNTER" = 0 ]
     then
         # Create a New Entry
@@ -300,6 +300,7 @@ add_usage_entry() {
 
 main() {
   local -a q
+  local -i DIFFICULTY_SCORE
     IFS=':'
     # shellcheck disable=SC2162
     read -a q <<<"$(sort "$DECK" -n --field-separator=: --key=4 | head -n "$CARD_POOL_SIZE" | shuf -n 1)"
@@ -308,9 +309,6 @@ main() {
     print-head "${q[@]}"
     echo -e "
 ${LGREY}──────────────── Press [Enter] to continue ────────────────${NC}"
-    popd
-    return
-
     # shellcheck disable=SC2162
     read -sn 1 NEXT
     while [ ! "$NEXT" = "" ] && [ ! "$NEXT" = q ] && [ ! "$NEXT" = Q ]
@@ -318,36 +316,43 @@ ${LGREY}──────────────── Press [Enter] to contin
         # shellcheck disable=SC2162
         read -sn 1 NEXT
     done
-    clear
-    print-head "${q[@]}"
-    { [ "$NEXT" = q ] || [ "$NEXT" = Q ]; } && add_usage_entry && clear && exit 0
+    echo -ne "\e[1F"
+
+    { [ "$NEXT" = q ] || [ "$NEXT" = Q ]; } && add-usage-entry && clear && exit 0
 
     ANSWER=$(echo "${q[2]}" | fold -w 59)
 
-    echo -e "___________________________________________________________
+    cat <<-EOF
+	___________________________________________________________
+	
+	$([ ${#ANSWER} -lt 59 ] && printf "%$(((59 - ${#ANSWER}) / 2))s")$ANSWER
+	
+	${REVERSE}===========================================================${REVERSE}
+	
+	${LGREY}How Difficult Was This Question?${NC}
+	
+	${LRED}Hard${NC} [1]   ${RED}Difficult${NC} [2]   ${YELLOW}Normal${NC} [3]   ${GREEN}Mild${NC} [4]   ${LGREEN}Easy${NC} [5]
+	
+	${LGREY}Select a number to continue, or${NC} ${LRED}Q${NC} ${LGREY}to quit...${NC}"
+	EOF
 
-$([ ${#ANSWER} -lt 59 ] && printf "%$(((59 - ${#ANSWER}) / 2))s")$ANSWER
-
-${WHITEBG}${WHITE}===========================================================${NC}
-
-${LGREY}How Difficult Was This Question?${NC}
-
-${LRED}Hard${NC} [1]   ${RED}Difficult${NC} [2]   ${YELLOW}Normal${NC} [3]   ${GREEN}Mild${NC} [4]   ${LGREEN}Easy${NC} [5]
-
-${LGREY}Select a number to continue, or${NC} ${LRED}Q${NC} ${LGREY}to quit...${NC}"
     # shellcheck disable=SC2162
-    read -sn 1 DIFFICULTY_SCORE
-    while [[ ! "$DIFFICULTY_SCORE" =~ [12345qQ] ]]; do
-        # shellcheck disable=SC2162
-        read -sn 1 DIFFICULTY_SCORE
+    read -sn 1
+    while [[ ! "$REPLY" =~ [12345qQ] ]]
+    do read -sn 1 
     done
-    { [ "$DIFFICULTY_SCORE" = q ] || [ "$DIFFICULTY_SCORE" = Q ]; } &&
-        add_usage_entry && clear && exit 0
+    [ "${REPLY,,}" = q ] && add-usage-entry && clear && exit 0
+    DIFFICULTY_SCORE=REPLY
+
     clear
+    popd
+    return
 
-    COUNTER="$((COUNTER + 1))" # Increment count for card review count increment
+    # Increment count for card review count increment
+    ((COUNTER++))
 
-    if [ "${q[3]}" = 0 ]; then
+    if (( ${q[3]} == 0 ))
+    then
         NEW_ITEM_SCORE=0
         case "$DIFFICULTY_SCORE" in
         [123]) NEW_ITEM_SCORE=0 ;; #HARD DIFFICULTY & NORMAL
