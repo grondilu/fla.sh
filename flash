@@ -5,12 +5,14 @@
 #     Bryan Jenks
 #         - www.bryanjenks.xyz
 #         - https://github.com/tallguyjenks/flash.sh
-#     Lucien Grondin
+#     Modified by Lucien Grondin
 #         - https://github.com/grondilu/fla.sh
 #
 # SOURCE:
 #     This file is based off of the one presented in this YouTube Video by nixcasts:
 #         - https://www.youtube.com/watch?v=lX8jqo70r1I
+#     Regarding ANSI escape sequences:
+#         - https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
 #
 # PURPOSE:
 #     To have a command line flash card tool with minimal code, plain text input and output
@@ -52,7 +54,7 @@ declare WHITEBG=$'\033[1;47m'
 # FONT FORMAT EXCAPE CODES
 declare BOLD=$'\e[1m'
 
-print_usage() {
+print-usage() {
   cat <<-END_USAGE
 	${LCYAN}fla.sh --- Flash card system by Bryan Jenks${NC} ${LBLUE}<BryanJenks@protonmail.com>${NC}
 	
@@ -66,7 +68,7 @@ print_usage() {
 	END_USAGE
 }
 
-print_info() {
+print-info() {
   cat <<-END_INFO
 	This flash card system works via colon ${YELLOW}:${NC} separated ${YELLOW}.csv${NC} files
 	
@@ -231,13 +233,13 @@ process-args() {
   do
     echo "option $o"
       case "$o" in
-        h) print_usage && return 0 ;;
-        i) print_info && return 0 ;;
+        h) print-usage && return 0 ;;
+        i) print-info && return 0 ;;
         v) echo -e "\n${YELLOW}fla.sh Current Version:${NC} ${RED}1.2${NC}\n" && return 0 ;;
         p) { [[ $(command -v "$OPTARG" 2>&1) ]] && PREVIEWER=$OPTARG; } ||
           >&2 echo "Unable to find previewer $OPTARG. Exiting..." &&
           return 1 ;;
-        *) print_usage && return 1 ;;
+        *) print-usage && return 1 ;;
       esac
   done
 }
@@ -298,29 +300,37 @@ add-usage-entry() {
 # and exit quietly
 [ -z "$DECK" ] && clear && return 1
 
-main() {
+quiz() {
   local -a q
+  local ANSWER
   local -i DIFFICULTY_SCORE
-    IFS=':'
-    # shellcheck disable=SC2162
-    read -a q <<<"$(sort "$DECK" -n --field-separator=: --key=4 | head -n "$CARD_POOL_SIZE" | shuf -n 1)"
-    clear
 
+  wc -l < "$DECK" | {
+    local -i NR PICK
+    read NR
+
+    PICK=$((RANDOM%(NR < CARD_POOL_SIZE ? NR : CARD_POOL_SIZE)+1))
+    IFS=: sort "$DECK" -n --field-separator=: --key=4 |
+      sed -n "${PICK}p"
+  } |
+  {
+    read -r -a q
+
+    clear
     print-head "${q[@]}"
-    echo -e "
-${LGREY}──────────────── Press [Enter] to continue ────────────────${NC}"
-    # shellcheck disable=SC2162
-    read -sn 1 NEXT
-    while [ ! "$NEXT" = "" ] && [ ! "$NEXT" = q ] && [ ! "$NEXT" = Q ]
-    do
-        # shellcheck disable=SC2162
-        read -sn 1 NEXT
+    echo -e "\n${LGREY}──────────────── Press [Enter] to continue ────────────────${NC}"
+
+    while
+      read -sn 1 < /dev/tty
+      ! [[ "$REPLY" =~ ^[qQ]?$ ]]
+    do :
     done
     echo -ne "\e[1F"
 
-    { [ "$NEXT" = q ] || [ "$NEXT" = Q ]; } && add-usage-entry && clear && exit 0
+    echo REPLY was $REPLY
+    [[ "${REPLY,}" = q ]] && add-usage-entry && clear && exit 0
 
-    ANSWER=$(echo "${q[2]}" | fold -w 59)
+    ANSWER=$(echo "${q[2]}" | fmt -w 59)
 
     cat <<-EOF
 	___________________________________________________________
@@ -336,22 +346,28 @@ ${LGREY}──────────────── Press [Enter] to contin
 	${LGREY}Select a number to continue, or${NC} ${LRED}Q${NC} ${LGREY}to quit...${NC}"
 	EOF
 
+
+    local -Ari difficulty=([H]=0 [D]=1 [N]=2 [M]=3 [E]=4) 
     # shellcheck disable=SC2162
-    read -sn 1
-    while [[ ! "$REPLY" =~ [12345qQ] ]]
-    do read -sn 1 
+    while
+      read -sn 1 </dev/tty
+      [[ ! "${REPLY^}" =~ [12345QHDNME] ]]
+    do :
     done
-    [ "${REPLY,,}" = q ] && add-usage-entry && clear && exit 0
-    DIFFICULTY_SCORE=REPLY
+    [[ "${REPLY,}" = q ]] && add-usage-entry && clear && exit 0
+
+    if [[ "${REPLY^}" =~ [HDNME] ]]
+    then DIFFICULTY_SCORE=${difficulty[${REPLY^}]}
+    else DIFFICULTY_SCORE=REPLY
+    fi
 
     clear
-    popd
-    return
 
     # Increment count for card review count increment
     ((COUNTER++))
 
-    if (( ${q[3]} == 0 ))
+    local -i NEW_ITEM_SCORE
+    if (( q[3] == 0 ))
     then
         NEW_ITEM_SCORE=0
         case "$DIFFICULTY_SCORE" in
@@ -360,8 +376,8 @@ ${LGREY}──────────────── Press [Enter] to contin
         5) NEW_ITEM_SCORE=2 ;; #EASY
         *) NEW_ITEM_SCORE=0 ;; #INVALID
         esac
-
-    elif [ "${q[3]}" = 1 ]; then
+    elif (( q[3] == 1 ))
+    then
         case "$DIFFICULTY_SCORE" in
         1) NEW_ITEM_SCORE=0 ;; #HARD
         2) NEW_ITEM_SCORE=0 ;; #DIFFICULT
@@ -374,25 +390,28 @@ ${LGREY}──────────────── Press [Enter] to contin
         case "$DIFFICULTY_SCORE" in
         1) NEW_ITEM_SCORE="$((q[3] - 2))" ;; #HARD
         2) NEW_ITEM_SCORE="$((q[3] - 1))" ;; #DIFFICULTY
-        3) NEW_ITEM_SCORE="${q[3]}" ;; #NORMAL
+        3) NEW_ITEM_SCORE="${q[3]}"       ;; #NORMAL
         4) NEW_ITEM_SCORE="$((q[3] + 1))" ;; #MILD
         5) NEW_ITEM_SCORE="$((q[3] + 2))" ;; #EASY
-        *) NEW_ITEM_SCORE="${q[3]}" ;; #INVALID
+        *) NEW_ITEM_SCORE="${q[3]}"       ;; #INVALID
         esac
     fi
 
     # Update item score for each flashcard item
-    ## Remove forward slashes in the Questions and answers
-
-    QUESTION_REGEX="$(sed "s/\(\/\|\[\|\]\|\*\)/\\\\\1/g" <<<"${q[1]}")"
-    ANSWER_REGEX="$(sed "s/\(\/\|\[\|\]\|\*\)/\\\\\1/g" <<<"${q[2]}")"
-    sed -i .bak "s/${q[0]}:$QUESTION_REGEX:$ANSWER_REGEX:${q[3]}/${q[0]}:$QUESTION_REGEX:$ANSWER_REGEX:$NEW_ITEM_SCORE/g" "$DECK" && rm ./*.bak
+    sed -i "${PICK}s/:[^:]*$/:$NEW_ITEM_SCORE/" "$DECK"
     
     # If no highscore currently set, set it.
     [ -z "$(cat "$HIGH_SCORE")" ] && echo "$COUNTER" >"$HIGH_SCORE"
 
+    local -i high_score
+    read high_score < "$HIGH_SCORE"
     # If Cards Reviewed > Current High Score, Update
-    [ "$COUNTER" -gt "$(cat "$HIGH_SCORE")" ] && echo "$COUNTER" >"$HIGH_SCORE"
+    ((COUNTER > high_score)) && echo "$COUNTER" >"$HIGH_SCORE"
+
+  }
+
+  popd
+
 }
 
 #while true
