@@ -32,18 +32,18 @@ declare PREVIEWER='bat'          ########## What fzf previewer to use when searc
 declare CURR_DECK_DISPLAY="file" # Options are 'file' or 'path'
 
 # ANSI FOREGROUND ESCAPE COLORS
-declare RED=$'\033[0;31m'
-declare LRED=$'\033[1;31m'
+declare    RED=$'\033[0;31m'
+declare   LRED=$'\033[1;31m'
 declare YELLOW=$'\033[1;33m'
-declare GREEN=$'\033[0;32m'
+declare  GREEN=$'\033[0;32m'
 declare LGREEN=$'\033[1;32m'
-declare LBLUE=$'\033[1;34m'
-declare CYAN=$'\033[0;36m'
-declare LCYAN=$'\033[1;36m'
+declare  LBLUE=$'\033[1;34m'
+declare   CYAN=$'\033[0;36m'
+declare  LCYAN=$'\033[1;36m'
 declare ORANGE=$'\033[0;33m'
-declare LGREY=$'\033[0;37m'
-declare WHITE=$'\033[1;37m'
-declare NC=$'\033[0m' # No Color
+declare  LGREY=$'\033[0;37m'
+declare  WHITE=$'\033[1;37m'
+declare     NC=$'\033[0m' # No Color
 
 # ANSI BACKGROUND ESCAPE COLORS
 declare WHITEBG=$'\033[1;47m'
