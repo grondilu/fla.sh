@@ -55,13 +55,62 @@ print_usage() {
 	${LCYAN}fla.sh --- Flash card system by Bryan Jenks${NC} ${LBLUE}<BryanJenks@protonmail.com>${NC}
 	
 	${YELLOW}${BOLD}Usage:${NC}
-	\t${GREEN}flash -h:${NC} Print this help text
-	\t${GREEN}flash -i:${NC} Print Information about the flashcard system
-	\t${GREEN}flash -v:${NC} Print version Number
-	\t${GREEN}flash -p [BINARY]:${NC} Change the previewer when selecting decks.
-	\t\tDefault: ${GREEN}bat${NC}
-	\t\tSupported: ${GREEN}bat${NC}, ${GREEN}cat${NC}
+	    ${GREEN}flash -h:${NC} Print this help text
+	    ${GREEN}flash -i:${NC} Print Information about the flashcard system
+	    ${GREEN}flash -v:${NC} Print version Number
+	    ${GREEN}flash -p [BINARY]:${NC} Change the previewer when selecting decks.
+	        Default: ${GREEN}bat${NC}
+	        Supported: ${GREEN}bat${NC}, ${GREEN}cat${NC}
 	END_USAGE
+}
+
+print_info() {
+  cat <<-END_INFO
+	This flash card system works via colon ${YELLOW}:${NC} separated ${YELLOW}.csv${NC} files
+	
+	with entries that look like this: ${LGREY}category:question:answer:0${NC}
+	
+	These ${YELLOW}.csv${NC} files should be stored in your
+	
+	    ${YELLOW}\$XDG_DATA_HOME/flash${NC}
+	OR
+	    ${YELLOW}~/.local/share/flash${NC} for Linux
+	    ${YELLOW}~/Library/Application Support/flash${NC} for mac
+	-------------------------------------------------------------------------------
+	${LCYAN}Exiting:${NC}
+	
+	    You can exit the application at any time by pressing either ${RED}q${NC} or ${RED}Q${NC}
+	
+	${LCYAN}Usage:${NC}
+	
+	    You will first be prompted with a question and will need to press ${RED}[Enter]${NC}
+	    to reveal the answer. Once the answer is revealed you will need to either
+	    quit, or give a rating to how difficult the question was.
+	
+	${LCYAN}The Scoring System:${NC}
+	
+	    The last field in the ${YELLOW}.csv${NC} files is the current point score of the 'card'
+	    Every time you rate a card the point score will either increase, decrease,
+	    or stay the same. zero is the lowest value, and the upper limit is over
+	    100 billion.
+	
+	    ${CYAN}Scoring Results:${NC}
+	    	[${LRED}Hard${NC}]		-2 points
+	    	[${RED}Difficult${NC}]	-1 point
+	    	[${YELLOW}Normal${NC}]	No Change
+	    	[${GREEN}Mild${NC}]		+1 point
+	    	[${LGREEN}Easy${NC}]		+2 points
+	
+	    The cards with the lowest scores (you scored them as ${LRED}Hard${NC}/${RED}Difficult${NC}) are
+	    sorted to the top, a pool of them are picked and from that pool 1 card is
+	    randomly drawn. As you become more familair with the material and rate it
+	    as easier, the point values will go up and the cards will appear less
+	    frequently making room for those cards that are still difficult and have
+	    lower point values.
+	
+	It is a good idea to start all cards off at ${YELLOW}0${NC} initially so that they all
+	have an equal chance of being drawn initially.
+	END_INFO
 }
 
 # Remember User's Starting Directory
@@ -82,14 +131,8 @@ HIGH_SCORE="$DIR/.highscore"
 # Track number of cards reviewed per session
 REVIEW_LOG="$DIR/.reviews"
 # Iterator for Count of cards reveiwed
-COUNTER=0
-# Success message of setup process
-DIR_MADE_MSG="
-Your ${LRED}$DIR${NC} directory has been made and
-your ${ORANGE}deck.csv${NC} file is ready for you to enter your flashcard data
-If you want to see information about ${ORANGE}fla.sh${NC} then use the option
-${YELLOW}flash -i${NC}.
-"
+declare -i COUNTER=0
+
 # User has .local/share directory but no decks inside
 NO_DECKS="
 No decks were found, please make a new deck
@@ -102,6 +145,12 @@ ${GREEN}Math:What is the square root of 4?:2:0${NC}
 
 # Define setup process in a function and create necessary files for user
 setup() {
+  # Success message of setup process
+  local -r DIR_MADE_MSG="
+  Your ${LRED}$DIR${NC} directory has been made and
+  your ${ORANGE}deck.csv${NC} file is ready for you to enter your flashcard data
+  If you want to see information about ${ORANGE}fla.sh${NC} then use the option
+  ${YELLOW}flash -i${NC}."
   if : mkdir "$DIR"
   then
     if : touch "$EXAMPLE_DECK" "$HIGH_SCORE" "$REVIEW_LOG"
@@ -143,90 +192,59 @@ setup() {
   fi
 }
 
-return 
-
 # Test if .local/share exists and wether to offer setup process
-if [ ! -d "$DIR" ]; then
+if [ ! -d "$DIR" ]
+then
     echo -e "No ${LRED}$DIR${NC} directory, make it? ${LGREEN}Y${NC}/${LRED}N${NC}"
     # shellcheck disable=SC2162
-    read RESPONSE
-    case "$RESPONSE" in
-    [QqNn]) exit 0 ;;
-    [Yy]) setup && exit 0 ;;
+    read 
+    case "${REPLY,,}" in
+    [qn]) : exit 0 ;;
+    y) setup && exit 0 ;;
     *) >&2 echo -e "invalid choice, please select either ${LGREEN}y${NC} or ${LRED}n${NC}" && exit 1 ;;
     esac
 fi
 
 # go to the flashcard decks directory
-cd "$DIR" || exit 1
+#cd "$DIR" || exit 1
+: pushd "$DIR"
 
 # If there are no flashcard decks available return user to starting location
 # while also displaying explanatory text of issue
-[ "$(find . -maxdepth "$SEARCH_DEPTH" -iname "*.csv" | wc -l)" = 0 ] &&
-    >&2 echo -e "$NO_DECKS" && exit 1
+if ! find . -maxdepth "$SEARCH_DEPTH" -iname "*.csv" | read
+then 
+  >&2 echo "$NO_DECKS"
+  : exit 1
+fi
 
 # if highscore file was removed, remake it.
-[ ! -e "$HIGH_SCORE" ] && touch "$HIGH_SCORE"
+[ -e "$HIGH_SCORE" ] || : touch "$HIGH_SCORE"
 
 # if reviewed file was removed, remake it.
-[ ! -e "$REVIEW_LOG" ] && touch "$REVIEW_LOG"
+[ -e "$REVIEW_LOG" ] || : touch "$REVIEW_LOG"
 
-
-print_info() {
-    echo -e "\nThis flash card system works via colon ${YELLOW}:${NC} separated ${YELLOW}.csv${NC} files\n
-with entries that look like this: ${LGREY}category:question:answer:0${NC}\n
-These ${YELLOW}.csv${NC} files should be stored in your
-
-\t${YELLOW}\$XDG_DATA_HOME/flash${NC}
-OR
-\t${YELLOW}~/.local/share/flash${NC} for Linux
-\t${YELLOW}~/Library/Application Support/flash${NC} for mac
--------------------------------------------------------------------------------
-${LCYAN}Exiting:${NC}\n
-\tYou can exit the application at any time by pressing either ${RED}q${NC} or ${RED}Q${NC}
-
-${LCYAN}Usage:${NC}\n
-\tYou will first be prompted with a question and will need to press ${RED}[Enter]${NC}
-\tto reveal the answer. Once the answer is revealed you will need to either
-\tquit, or give a rating to how difficult the question was.
-
-${LCYAN}The Scoring System:${NC}\n
-\tThe last field in the ${YELLOW}.csv${NC} files is the current point score of the 'card'
-\tEvery time you rate a card the point score will either increase, decrease,
-\tor stay the same. zero is the lowest value, and the upper limit is over
-\t100 billion.
-
-\t${CYAN}Scoring Results:${NC}
-\t\t[${LRED}Hard${NC}]\t\t-2 points
-\t\t[${RED}Difficult${NC}]\t-1 point
-\t\t[${YELLOW}Normal${NC}]\tNo Change
-\t\t[${GREEN}Mild${NC}]\t\t+1 point
-\t\t[${LGREEN}Easy${NC}]\t\t+2 points
-
-\tThe cards with the lowest scores (you scored them as ${LRED}Hard${NC}/${RED}Difficult${NC}) are
-\tsorted to the top, a pool of them are picked and from that pool 1 card is
-\trandomly drawn. As you become more familair with the material and rate it
-\tas easier, the point values will go up and the cards will appear less
-\tfrequently making room for those cards that are still difficult and have
-\tlower point values.
-
-    It is a good idea to start all cards off at ${YELLOW}0${NC} initially so that they all
-    have an equal chance of being drawn initially.
-"
+process-args() {
+  local OPTIND OPTARG o
+  while getopts 'hivp:' o
+  do
+    echo "option $o"
+      case "$o" in
+        h) print_usage && return 0 ;;
+        i) print_info && return 0 ;;
+        v) echo -e "\n${YELLOW}fla.sh Current Version:${NC} ${RED}1.2${NC}\n" && return 0 ;;
+        p) { [[ $(command -v "$OPTARG" 2>&1) ]] && PREVIEWER=$OPTARG; } ||
+          >&2 echo "Unable to find previewer $OPTARG. Exiting..." &&
+          return 1 ;;
+        *) print_usage && return 1 ;;
+      esac
+  done
 }
 
-while getopts 'hivp:' flag; do
-    case "${flag}" in
-    h) print_usage && exit 0 ;;
-    i) print_info && exit 0 ;;
-    v) echo -e "\n${YELLOW}fla.sh Current Version:${NC} ${RED}1.2${NC}\n" && exit 0 ;;
-    p) { [[ $(command -v "$OPTARG" 2>&1) ]] && PREVIEWER=$OPTARG; } || >&2 echo "Unable to find previewer $OPTARG. Exiting..." && exit 1 ;;
-    *) print_usage && exit 1 ;;
-    esac
-done
+return
 
 # Set some parameters for preview command used by FZF
-while [ -z "$PREVIEWER_PARAMTERS" ]; do
+while [ -z "$PREVIEWER_PARAMTERS" ]
+do
     case "$PREVIEWER" in
     bat) PREVIEWER_PARAMTERS="--theme='Solarized (dark)' --style=numbers --color=always" ;;
     cat) PREVIEWER_PARAMTERS="-b" ;;
