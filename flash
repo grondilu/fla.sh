@@ -45,6 +45,8 @@ declare  LGREY=$'\033[0;37m'
 declare  WHITE=$'\033[1;37m'
 declare     NC=$'\033[0m' # No Color
 
+declare REVERSE=$'\033[7m'
+
 # ANSI BACKGROUND ESCAPE COLORS
 declare WHITEBG=$'\033[1;47m'
 # FONT FORMAT EXCAPE CODES
@@ -151,11 +153,11 @@ setup() {
   your ${ORANGE}deck.csv${NC} file is ready for you to enter your flashcard data
   If you want to see information about ${ORANGE}fla.sh${NC} then use the option
   ${YELLOW}flash -i${NC}."
-  if : mkdir "$DIR"
+  if mkdir "$DIR"
   then
-    if : touch "$EXAMPLE_DECK" "$HIGH_SCORE" "$REVIEW_LOG"
+    if touch "$EXAMPLE_DECK" "$HIGH_SCORE" "$REVIEW_LOG"
     then
-      if cat <<-END_TEMPLATE # >> "$EXAMPLE_DECK"
+      if cat <<-END_TEMPLATE >> "$EXAMPLE_DECK"
 	History:When was the declaration of independence signed?:1776:0
 	Math:What is the square root of 4?:2:4
 	Science:What is the charge on a proton?:Positive 1:2
@@ -199,22 +201,22 @@ then
     # shellcheck disable=SC2162
     read 
     case "${REPLY,,}" in
-    [qn]) : exit 0 ;;
-    y) setup && exit 0 ;;
+    [qn]) return 0 ;;
+    y) setup && return 0 ;;
     *) >&2 echo -e "invalid choice, please select either ${LGREEN}y${NC} or ${LRED}n${NC}" && exit 1 ;;
     esac
 fi
 
 # go to the flashcard decks directory
 #cd "$DIR" || exit 1
-: pushd "$DIR"
+pushd "$DIR"
 
 # If there are no flashcard decks available return user to starting location
 # while also displaying explanatory text of issue
 if ! find . -maxdepth "$SEARCH_DEPTH" -iname "*.csv" | read
 then 
   >&2 echo "$NO_DECKS"
-  : exit 1
+  return 1
 fi
 
 # if highscore file was removed, remake it.
@@ -240,15 +242,16 @@ process-args() {
   done
 }
 
-return
-
 # Set some parameters for preview command used by FZF
 while [ -z "$PREVIEWER_PARAMTERS" ]
 do
     case "$PREVIEWER" in
     bat) PREVIEWER_PARAMTERS="--theme='Solarized (dark)' --style=numbers --color=always" ;;
     cat) PREVIEWER_PARAMTERS="-b" ;;
-    *) echo -e "${RED}$PREVIEWER${NC} is not a valid previewer. Use '${GREEN}bat${NC}' or '${GREEN}cat${NC}'. Falling back on default...\n" && read -r -s -p 'Press [Enter] to continue...' && echo -e "\n" && PREVIEWER='bat' ;;
+    *) echo -e "${RED}$PREVIEWER${NC} is not a valid previewer. Use '${GREEN}bat${NC}' or '${GREEN}cat${NC}'. Falling back on default...\n" &&
+      read -r -s -p 'Press [Enter] to continue...' &&
+      echo -e "\n" &&
+      PREVIEWER='bat' ;;
     esac
 done
 
@@ -257,32 +260,32 @@ DECK="$(find . -maxdepth "$SEARCH_DEPTH" -iname "*.csv" | fzf --preview="$PREVIE
 
 # Get current deck name for display
 case "$CURR_DECK_DISPLAY" in
-file) CURRENT_DECK="$(echo "$DECK" | awk -F/ '{print $NF}')" ;;
-path) CURRENT_DECK="$DECK" ;;
-*) CURRENT_DECK="$(echo "$DECK" | awk -F/ '{print $NF}')" ;;
+  file) CURRENT_DECK="$(echo "$DECK" | awk -F/ '{print $NF}')" ;;
+  path) CURRENT_DECK="$DECK" ;;
+  *) CURRENT_DECK="$(echo "$DECK" | awk -F/ '{print $NF}')" ;;
 esac
 
 # The top part of the flash display so that code is not duplicated twice
-print_head() {
-
-    QUESTION=$(echo "${q[1]}" | fold -w 59)
-
-    echo -e "${WHITEBG}          Fla.sh - Flash Cards In Your Terminal            ${NC}
-${ORANGE}${BOLD}  Current Deck:${BOLD}${NC}\t$(basename -s .csv "$CURRENT_DECK")
-${ORANGE}${BOLD}Cards Reviewed:${BOLD}${NC}\t$COUNTER
-\t${ORANGE}${BOLD}High Score:${BOLD}${NC}\t$(cat "$HIGH_SCORE")
-\t${ORANGE}${BOLD}Avg review:${BOLD}${NC}\t$(awk '{ sum += $7; n++ } END { if (n > 0) print sum / n; }' "$REVIEW_LOG")
-
-${LGREY}Category:${NC} ${q[0]}
-___________________________________________________________
-
-$([ ${#QUESTION} -lt 59 ] && printf "%$(((59 - ${#QUESTION}) / 2))s")$QUESTION"
-
+print-head() {
+    local QUESTION=$(echo "$2" | fold -w 59)
+    cat <<-EOF
+	 $REVERSE          Fla.sh - Flash Cards In Your Terminal            $REVERSE
+	${ORANGE}${BOLD}  Current Deck:${BOLD}${NC}	$(basename -s .csv "$CURRENT_DECK")
+	${ORANGE}${BOLD}Cards Reviewed:${BOLD}${NC}	$COUNTER
+	    ${ORANGE}${BOLD}High Score:${BOLD}${NC}	$(cat "$HIGH_SCORE")
+	    ${ORANGE}${BOLD}Avg review:${BOLD}${NC}	$(awk '{ sum += $7; n++ } END { if (n > 0) print sum / n; }' "$REVIEW_LOG")
+	
+	${LGREY}Category:${NC} $1
+	___________________________________________________________
+	
+	$([ ${#QUESTION} -lt 59 ] && printf "%$(((59 - ${#QUESTION}) / 2))s")$QUESTION
+	EOF
 }
 
 # Creating new entries in the log for the average score generation
 add_usage_entry() {
-    if [ ! "$COUNTER" = 0 ]; then
+    if [ ! "$COUNTER" = 0 ]
+    then
         # Create a New Entry
         TIME_STAMP=$(date +"%Y%m%d %H:%M:%S")
         printf -v ENTRY "TimeStamp: %s Deck: %s cardsReviewed: %s" "$TIME_STAMP" "$CURRENT_DECK" "$COUNTER"
@@ -293,24 +296,30 @@ add_usage_entry() {
 # If no deck is selected in fzf menu
 # return user to start location
 # and exit quietly
-[ -z "$DECK" ] && clear && exit 1
+[ -z "$DECK" ] && clear && return 1
 
 main() {
-    IFS=$':'
+  local -a q
+    IFS=':'
     # shellcheck disable=SC2162
     read -a q <<<"$(sort "$DECK" -n --field-separator=: --key=4 | head -n "$CARD_POOL_SIZE" | shuf -n 1)"
     clear
-    print_head
+
+    print-head "${q[@]}"
     echo -e "
 ${LGREY}──────────────── Press [Enter] to continue ────────────────${NC}"
+    popd
+    return
+
     # shellcheck disable=SC2162
     read -sn 1 NEXT
-    while [ ! "$NEXT" = "" ] && [ ! "$NEXT" = q ] && [ ! "$NEXT" = Q ]; do
+    while [ ! "$NEXT" = "" ] && [ ! "$NEXT" = q ] && [ ! "$NEXT" = Q ]
+    do
         # shellcheck disable=SC2162
         read -sn 1 NEXT
     done
     clear
-    print_head
+    print-head "${q[@]}"
     { [ "$NEXT" = q ] || [ "$NEXT" = Q ]; } && add_usage_entry && clear && exit 0
 
     ANSWER=$(echo "${q[2]}" | fold -w 59)
@@ -381,6 +390,6 @@ ${LGREY}Select a number to continue, or${NC} ${LRED}Q${NC} ${LGREY}to quit...${N
     [ "$COUNTER" -gt "$(cat "$HIGH_SCORE")" ] && echo "$COUNTER" >"$HIGH_SCORE"
 }
 
-while true; do
-    main
-done
+#while true
+#do main
+#done
