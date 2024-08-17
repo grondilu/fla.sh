@@ -260,20 +260,13 @@ done
 # Show pretty FZF preview of decks using $PREVIEWER. Default: BAT
 DECK="$(find . -maxdepth "$SEARCH_DEPTH" -iname "*.csv" | fzf --preview="$PREVIEWER $PREVIEWER_PARAMTERS {} | head -500")"
 
-# Get current deck name for display
-case "$CURR_DECK_DISPLAY" in
-  file) CURRENT_DECK="$(echo "$DECK" | awk -F/ '{print $NF}')" ;;
-  path) CURRENT_DECK="$DECK" ;;
-  *) CURRENT_DECK="$(echo "$DECK" | awk -F/ '{print $NF}')" ;;
-esac
-
 # Creating new entries in the log for the average score generation
 add-usage-entry() {
     if [ ! "$COUNTER" = 0 ]
     then
         # Create a New Entry
         TIME_STAMP=$(date +"%Y%m%d %H:%M:%S")
-        printf -v ENTRY "TimeStamp: %s Deck: %s cardsReviewed: %s" "$TIME_STAMP" "$CURRENT_DECK" "$COUNTER"
+        printf -v ENTRY "TimeStamp: %s Deck: %s cardsReviewed: %s" "$TIME_STAMP" "${DECK##*/}" "$COUNTER"
         echo "$ENTRY" >>"$REVIEW_LOG"
     fi
 }
@@ -303,7 +296,7 @@ quiz() {
     clear
     cat <<-EOF
 	$REVERSE$BOLD          Fla.sh - Flash Cards In Your Terminal            $BOLD$REVERSE
-	${ORANGE}${BOLD}  Current Deck:${BOLD}${NC}	$(basename -s .csv "$CURRENT_DECK")
+	${ORANGE}${BOLD}  Current Deck:${BOLD}${NC}	$(basename -s .csv "${DECK##*/}")
 	${ORANGE}${BOLD}Cards Reviewed:${BOLD}${NC}	$COUNTER
 	    ${ORANGE}${BOLD}High Score:${BOLD}${NC}	$(cat "$HIGH_SCORE")
 	    ${ORANGE}${BOLD}Avg review:${BOLD}${NC}	$(awk '{ sum += $7; n++ } END { if (n > 0) print sum / n; }' "$REVIEW_LOG")
