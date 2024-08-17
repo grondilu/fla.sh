@@ -267,23 +267,6 @@ case "$CURR_DECK_DISPLAY" in
   *) CURRENT_DECK="$(echo "$DECK" | awk -F/ '{print $NF}')" ;;
 esac
 
-# The top part of the flash display so that code is not duplicated twice
-print-head() {
-    local QUESTION=$(echo "$2" | fold -w 59)
-    cat <<-EOF
-	 $REVERSE          Fla.sh - Flash Cards In Your Terminal            $REVERSE
-	${ORANGE}${BOLD}  Current Deck:${BOLD}${NC}	$(basename -s .csv "$CURRENT_DECK")
-	${ORANGE}${BOLD}Cards Reviewed:${BOLD}${NC}	$COUNTER
-	    ${ORANGE}${BOLD}High Score:${BOLD}${NC}	$(cat "$HIGH_SCORE")
-	    ${ORANGE}${BOLD}Avg review:${BOLD}${NC}	$(awk '{ sum += $7; n++ } END { if (n > 0) print sum / n; }' "$REVIEW_LOG")
-	
-	${LGREY}Category:${NC} $1
-	___________________________________________________________
-	
-	$([ ${#QUESTION} -lt 59 ] && printf "%$(((59 - ${#QUESTION}) / 2))s")$QUESTION
-	EOF
-}
-
 # Creating new entries in the log for the average score generation
 add-usage-entry() {
     if [ ! "$COUNTER" = 0 ]
@@ -301,23 +284,36 @@ add-usage-entry() {
 [ -z "$DECK" ] && clear && return 1
 
 quiz() {
-  local -a q
-  local ANSWER
-  local -i DIFFICULTY_SCORE
 
-  wc -l < "$DECK" | {
-    local -i NR PICK
-    read NR
-
-    PICK=$((RANDOM%(NR < CARD_POOL_SIZE ? NR : CARD_POOL_SIZE)+1))
-    IFS=: sort "$DECK" -n --field-separator=: --key=4 |
-      sed -n "${PICK}p"
+  sort "$DECK" -n --field-separator=: --key=4 |
+  {
+    local -i PICK
+    mapfile -t 
+    echo "${MAPFILE[
+      RANDOM%(${#MAPFILE[@]} < CARD_POOL_SIZE ? ${#MAPFILE[@]} : CARD_POOL_SIZE)
+    ]}"
   } |
   {
-    read -r -a q
+    local -a q
+    local ANSWER
+    local -i DIFFICULTY_SCORE
+
+    IFS=: read -r -a q
 
     clear
-    print-head "${q[@]}"
+    cat <<-EOF
+	$REVERSE$BOLD          Fla.sh - Flash Cards In Your Terminal            $BOLD$REVERSE
+	${ORANGE}${BOLD}  Current Deck:${BOLD}${NC}	$(basename -s .csv "$CURRENT_DECK")
+	${ORANGE}${BOLD}Cards Reviewed:${BOLD}${NC}	$COUNTER
+	    ${ORANGE}${BOLD}High Score:${BOLD}${NC}	$(cat "$HIGH_SCORE")
+	    ${ORANGE}${BOLD}Avg review:${BOLD}${NC}	$(awk '{ sum += $7; n++ } END { if (n > 0) print sum / n; }' "$REVIEW_LOG")
+	
+	${LGREY}Category:${NC} ${q[0]}
+	___________________________________________________________
+	
+	EOF
+        fmt -w59 <<<"${q[1]}"
+
     echo -e "\n${LGREY}──────────────── Press [Enter] to continue ────────────────${NC}"
 
     while
@@ -327,7 +323,6 @@ quiz() {
     done
     echo -ne "\e[1F"
 
-    echo REPLY was $REPLY
     [[ "${REPLY,}" = q ]] && add-usage-entry && clear && exit 0
 
     ANSWER=$(echo "${q[2]}" | fmt -w 59)
@@ -398,7 +393,7 @@ quiz() {
     fi
 
     # Update item score for each flashcard item
-    sed -i "${PICK}s/:[^:]*$/:$NEW_ITEM_SCORE/" "$DECK"
+    sed -i "$((PICK+1))s/:[^:]*$/:$NEW_ITEM_SCORE/" "$DECK"
     
     # If no highscore currently set, set it.
     [ -z "$(cat "$HIGH_SCORE")" ] && echo "$COUNTER" >"$HIGH_SCORE"
@@ -409,8 +404,6 @@ quiz() {
     ((COUNTER > high_score)) && echo "$COUNTER" >"$HIGH_SCORE"
 
   }
-
-  popd
 
 }
 
