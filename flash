@@ -333,20 +333,15 @@ quiz() {
     cat <<-EOF
 	___________________________________________________________
 	
-	$(
-	  fmt -w 59 <<<"${q[2]}" |
-	  while read -r
-          do printf "%$(( (59-${#REPLY})/2 ))s%s" ' ' "$REPLY"
-	  done
-        )
+	$(center "${q[2]}")
 	
 	${REVERSE}===========================================================${REVERSE}
 	
 	${LGREY}How Difficult Was This Question?${NC}
 	
-	${LRED}Hard${NC} [1]   ${RED}Difficult${NC} [2]   ${YELLOW}Normal${NC} [3]   ${GREEN}Mild${NC} [4]   ${LGREEN}Easy${NC} [5]
+	${LRED}[H]ard${NC}  ${RED}[D]ifficult${NC}  ${YELLOW}[N]ormal${NC}  ${GREEN}[M]ild${NC}  ${LGREEN}[E]asy${NC}
 	
-	${LGREY}Select a number to continue, or${NC} ${LRED}Q${NC} ${LGREY}to quit...${NC}"
+	${LGREY}Select a letter continue, or${NC} ${LRED}Q${NC} ${LGREY}to quit...${NC}"
 	EOF
 
 
