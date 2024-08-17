@@ -273,6 +273,13 @@ add-usage-entry() {
     fi
 }
 
+function center() {
+  fmt -w59 <<<"$1" |
+  while read -r
+  do printf "%$(( (59 - ${#REPLY})/2 ))s%s\n" ' ' "$REPLY"
+  done
+}
+
 # If no deck is selected in fzf menu
 # return user to start location
 # and exit quietly
@@ -295,7 +302,6 @@ quiz() {
   } |
   {
     local -a q
-    local ANSWER
     local -i DIFFICULTY_SCORE
 
     IFS=: read -r -a q
@@ -311,7 +317,7 @@ quiz() {
 	___________________________________________________________
 	
 	EOF
-        fmt -w59 <<<"${q[1]}"
+        center "${q[1]}"
 
     echo -e "\n${LGREY}──────────────── Press [Enter] to continue ────────────────${NC}"
 
@@ -324,12 +330,15 @@ quiz() {
 
     [[ "${REPLY,}" = q ]] && add-usage-entry && exit 0
 
-    ANSWER=$(echo "${q[2]}" | fmt -w 59)
-
     cat <<-EOF
 	___________________________________________________________
 	
-	$([ ${#ANSWER} -lt 59 ] && printf "%$(((59 - ${#ANSWER}) / 2))s")$ANSWER
+	$(
+	  fmt -w 59 <<<"${q[2]}" |
+	  while read -r
+          do printf "%$(( (59-${#REPLY})/2 ))s%s" ' ' "$REPLY"
+	  done
+        )
 	
 	${REVERSE}===========================================================${REVERSE}
 	
