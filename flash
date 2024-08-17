@@ -215,7 +215,9 @@ pushd "$DIR"
 
 # If there are no flashcard decks available return user to starting location
 # while also displaying explanatory text of issue
-if ! find . -maxdepth "$SEARCH_DEPTH" -iname "*.csv" | read
+if
+  ! find . -maxdepth "$SEARCH_DEPTH" -iname "*.csv" -print -quit |
+  read
 then 
   >&2 echo "$NO_DECKS"
   return 1
@@ -274,9 +276,14 @@ add-usage-entry() {
 # If no deck is selected in fzf menu
 # return user to start location
 # and exit quietly
-[ -z "$DECK" ] && clear && return 1
+[ -z "$DECK" ] && return 1
 
 quiz() {
+
+  clear
+
+  # hiding cursor
+  echo -e "\e[?25l"
 
   sort "$DECK" -n --field-separator=: --key=4 |
   {
@@ -293,7 +300,6 @@ quiz() {
 
     IFS=: read -r -a q
 
-    clear
     cat <<-EOF
 	$REVERSE$BOLD          Fla.sh - Flash Cards In Your Terminal            $BOLD$REVERSE
 	${ORANGE}${BOLD}  Current Deck:${BOLD}${NC}	$(basename -s .csv "${DECK##*/}")
@@ -316,7 +322,7 @@ quiz() {
     done
     echo -ne "\e[1F"
 
-    [[ "${REPLY,}" = q ]] && add-usage-entry && clear && exit 0
+    [[ "${REPLY,}" = q ]] && add-usage-entry && exit 0
 
     ANSWER=$(echo "${q[2]}" | fmt -w 59)
 
@@ -342,14 +348,12 @@ quiz() {
       [[ ! "${REPLY^}" =~ [12345QHDNME] ]]
     do :
     done
-    [[ "${REPLY,}" = q ]] && add-usage-entry && clear && exit 0
+    [[ "${REPLY,}" = q ]] && add-usage-entry && exit 0
 
     if [[ "${REPLY^}" =~ [HDNME] ]]
     then DIFFICULTY_SCORE=${difficulty[${REPLY^}]}
     else DIFFICULTY_SCORE=REPLY
     fi
-
-    clear
 
     # Increment count for card review count increment
     ((COUNTER++))
@@ -397,6 +401,9 @@ quiz() {
     ((COUNTER > high_score)) && echo "$COUNTER" >"$HIGH_SCORE"
 
   }
+
+  # restoring cursor
+  echo -e "\e[?25h\e[?47l"
 
 }
 
