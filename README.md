@@ -1,6 +1,6 @@
 # Fork notes
 
-This fork will change the following :
+The goal of this fork is to make the following changes :
 
 - cleaner code
 - more extensive use of bash features
