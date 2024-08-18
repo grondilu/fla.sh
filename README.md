@@ -1,3 +1,15 @@
+# Fork notes
+
+This fork will change the following :
+
+- cleaner code
+- more extensive use of bash features
+- a different space repetition algorithm
+- less emphasis on visuals (fewer colors, simpler pagination...)
+
+
+# Original Readme
+
 <!-- Header & Preview Image -->
 <h1 align="center">
 <img src="/img/flashheader.png" height="50%" width="50%">
